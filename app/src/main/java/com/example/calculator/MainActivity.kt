@@ -1,5 +1,6 @@
 package com.example.calculator
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -15,6 +16,7 @@ class MainActivity : AppCompatActivity() {
     private var currentOperator: Operator? = null
     private var result: Double? = null
     private val equation: StringBuilder = StringBuilder().append(ZERO)
+    private val historyList: MutableList<String> = mutableListOf()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,7 +26,6 @@ class MainActivity : AppCompatActivity() {
         setListeners()
         setNightModeIndicator()
     }
-
     private fun setListeners(){
         for (button in getNumericButtons()) {
             button.setOnClickListener { onNumberClicked(button.text.toString()) }
@@ -42,6 +43,12 @@ class MainActivity : AppCompatActivity() {
             buttonPlusMinus.setOnClickListener { onPlusMinusClicked() }
             buttonPercentage.setOnClickListener { onPercentageClicked() }
             imageNightMode.setOnClickListener { toggleNightMode() }
+
+            buttonHistory.setOnClickListener {
+                val intent = Intent(this@MainActivity, CalculatorHistoryActivity::class.java)
+                intent.putStringArrayListExtra("historyList", ArrayList(historyList))
+                startActivity(intent)
+            }
         }
     }
 
@@ -136,6 +143,16 @@ class MainActivity : AppCompatActivity() {
             result = calculate()
             equation.clear().append(ZERO)
             updateResultOnDisplay()
+
+            val formattedHistory = String.format(
+                "%s %s %s = %s",
+                getFormattedDisplayValue(inputValue1),
+                getOperatorSymbol(),
+                getFormattedDisplayValue(inputValue2),
+                getFormattedDisplayValue(result)
+            )
+            historyList.add(formattedHistory)
+
             binding.textEquation.text = "" // Clear the equation display
             inputValue1 = result
             result = null

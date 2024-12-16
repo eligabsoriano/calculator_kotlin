@@ -17,7 +17,7 @@
         app:layout_constraintEnd_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         />
-    
+
     <View
         android:id="@+id/viewDivider"
         android:layout_width="0dp"
@@ -27,7 +27,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         />
-    
+
     <TextView
         android:id="@+id/textInput"
         android:layout_width="0dp"
@@ -64,11 +64,21 @@
         android:id="@+id/imageNightMode"
         android:layout_width="32dp"
         android:layout_height="32dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         />
+
+    <Button
+        android:id="@+id/buttonHistory"
+        android:layout_width="60dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
+        android:text="@string/history"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <TableLayout
         android:id="@+id/buttonsContainer"

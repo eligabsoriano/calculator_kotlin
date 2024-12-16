@@ -20,4 +20,5 @@
     <string name="plus_minus">\u00B1</string>
     <string name="percentage">\u0025</string>
     <string name="all_clear">AC</string>
+    <string name="history">History button</string>
 </resources>
