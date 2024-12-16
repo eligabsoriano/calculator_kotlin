@@ -21,7 +21,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         enableEdgeToEdge()
-        setContentView(binding.root)
         setListeners()
         setNightModeIndicator()
     }
@@ -44,6 +43,20 @@ class MainActivity : AppCompatActivity() {
             buttonPercentage.setOnClickListener { onPercentageClicked() }
             imageNightMode.setOnClickListener { toggleNightMode() }
         }
+    }
+
+    private fun textEquationUpdate() {
+        val operand1Text = getFormattedDisplayValue(inputValue1)
+        val operatorSymbol = getOperatorSymbol()
+        val operand2Text = if (inputValue2 != null) getFormattedDisplayValue(inputValue2) else ""
+
+        val updatedEquation = String.format(
+            "%s %s %s",
+            operand1Text,
+            operatorSymbol,
+            operand2Text
+        )
+        binding.textEquation.text = updatedEquation
     }
 
     private fun toggleNightMode() {
@@ -108,8 +121,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onOperatorClicked(operator: Operator) {
-        onEqualsClicked()
-        currentOperator = operator
+        if (currentOperator == null) { // Initial operator selection
+            currentOperator = operator
+        } else { // Continue the calculation
+            onEqualsClicked()
+            currentOperator = operator
+        }
+        textEquationUpdate()
+        equation.clear() // Ready for the next input
     }
 
     private fun onEqualsClicked() {
@@ -117,6 +136,7 @@ class MainActivity : AppCompatActivity() {
             result = calculate()
             equation.clear().append(ZERO)
             updateResultOnDisplay()
+            binding.textEquation.text = "" // Clear the equation display
             inputValue1 = result
             result = null
             inputValue2 = null
@@ -127,11 +147,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun calculate(): Double {
+        val operand1 = getInputValue1()
+        val operand2 = getInputValue2()
+
         return when (requireNotNull(currentOperator)) {
-            Operator.ADDITION -> getInputValue1() + getInputValue2()
-            Operator.SUBTRACTION -> getInputValue1() - getInputValue2()
-            Operator.MULTIPLICATION -> getInputValue1() * getInputValue2()
-            Operator.DIVISION -> getInputValue1() / getInputValue2()
+            Operator.ADDITION -> operand1 + operand2
+            Operator.SUBTRACTION -> operand1 - operand2
+            Operator.MULTIPLICATION -> operand1 * operand2
+            Operator.DIVISION -> operand1 / operand2
         }
     }
 
@@ -168,21 +191,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun onNumberClicked(numberText: String) {
         if (equation.toString() == ZERO) {
-            equation.deleteCharAt(0)
+            equation.clear()
         } else if (equation.startsWith("$MINUS$ZERO") && equation.length == 2) {
             equation.deleteCharAt(1)
         }
         equation.append(numberText)
         setInput()
         updateInputOnDisplay()
+        textEquationUpdate()
     }
 
     private fun setInput(){
-        if (currentOperator == null){
-            inputValue1 = equation.toString().toDouble()
-        } else {
-            inputValue2 = equation.toString().toDouble()
+        val equationText = equation.toString()
+        if (equationText.isNotEmpty() && equationText.isValidNumber()) {
+            if (currentOperator == null) {
+                inputValue1 = equationText.toDouble()
+            } else {
+                inputValue2 = equationText.toDouble()
+            }
         }
+    }
+
+    private fun String.isValidNumber(): Boolean {
+        return this.toDoubleOrNull() != null
     }
 
     private fun clearDisplay(){
@@ -215,12 +246,14 @@ class MainActivity : AppCompatActivity() {
     private fun getInputValue2() = inputValue2 ?: 0.0
 
     private fun getOperatorSymbol(): String {
-        return when (requireNotNull(currentOperator)) {
-            Operator.ADDITION -> getString(R.string.addition)
-            Operator.SUBTRACTION -> getString(R.string.subtraction)
-            Operator.MULTIPLICATION -> getString(R.string.multiplication)
-            Operator.DIVISION -> getString(R.string.division)
-        }
+        return currentOperator?.let { operator ->
+            when (operator) {
+                Operator.ADDITION -> getString(R.string.addition)
+                Operator.SUBTRACTION -> getString(R.string.subtraction)
+                Operator.MULTIPLICATION -> getString(R.string.multiplication)
+                Operator.DIVISION -> getString(R.string.division)
+            }
+        } ?: ""  // Return an empty string if currentOperator is null
     }
 
     private fun getFormattedDisplayValue(value: Double?): String? {
