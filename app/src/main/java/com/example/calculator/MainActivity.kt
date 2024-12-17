@@ -13,11 +13,13 @@ import com.example.calculator.service.RetrofitClient
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import android.content.SharedPreferences
 
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var sharedPreferences: SharedPreferences
 
     private var inputValue1: Double? = 0.0
     private var inputValue2: Double? = null
@@ -30,7 +32,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        sharedPreferences = getSharedPreferences("CalculatorPrefs", MODE_PRIVATE)
         enableEdgeToEdge()
+        nightModePreference()
+        loadCalculationState()  // Load the saved calculation state
+        loadHistory()  // Load the saved history
         setListeners()
         setNightModeIndicator()
     }
@@ -76,21 +82,103 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toggleNightMode() {
-        if (AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES) {
+        val nightMode = sharedPreferences.getBoolean("NIGHT_MODE", false)
+        val editor = sharedPreferences.edit()
+
+        if (nightMode) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            editor.putBoolean("NIGHT_MODE", false)
         } else {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            editor.putBoolean("NIGHT_MODE", true)
         }
-        recreate()
+
+        editor.apply()
+        setNightModeIndicator()
+        saveCalculationState()
+
+        // Ensure the real-time display is updated after toggling night mode
+        binding.textInput.text = getFormattedDisplayValue(inputValue1)
+        textEquationUpdate() // Display real-time equation
+    }
+
+    private fun nightModePreference() {
+        val isNightMode = sharedPreferences.getBoolean("NIGHT_MODE", false)
+        if (isNightMode) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        }
+        // Prevent night mode toggle from interfering with input display
+        binding.textInput.text = getFormattedDisplayValue(inputValue1) // Show the current input
+        textEquationUpdate() // Ensure equation is updated
     }
 
     private fun setNightModeIndicator() {
-        if (AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES) {
+        val isNightMode = sharedPreferences.getBoolean("NIGHT_MODE", false)
+        if (isNightMode) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
             binding.imageNightMode.setImageResource(R.drawable.ic_moon)
         } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
             binding.imageNightMode.setImageResource(R.drawable.ic_sun)
         }
     }
+    private fun loadHistory() {
+        val historyString = sharedPreferences.getString("historyList", null)
+        historyString?.let {
+            historyList.clear()
+            historyList.addAll(it.split(","))
+        }
+    }
+
+    private fun saveHistory() {
+        val historyString = historyList.joinToString(",")
+        val editor = sharedPreferences.edit()
+        editor.putString("historyList", historyString)
+        editor.apply()
+    }
+
+    private fun loadCalculationState() {
+        val inputValue1String = sharedPreferences.getString("inputValue1", "0.0")
+        val inputValue2String = sharedPreferences.getString("inputValue2", null)
+        val resultString = sharedPreferences.getString("result", null)
+        val currentOperatorString = sharedPreferences.getString("currentOperator", null)
+        val equationString = sharedPreferences.getString("equation", "0")
+
+        inputValue1 = inputValue1String?.toDoubleOrNull() ?: 0.0
+        inputValue2 = inputValue2String?.toDoubleOrNull() // Restore inputValue2
+        result = resultString?.toDoubleOrNull() // Restore result
+        currentOperator = currentOperatorString?.let { Operator.valueOf(it) }
+        equation.clear().append(equationString)
+
+        // Update the UI with the restored state
+        updateInputOnDisplay()
+        textEquationUpdate()
+
+        // If there was a result or second operand, ensure they are displayed
+        if (result != null) {
+            binding.textInput.text = getFormattedDisplayValue(result)
+        } else {
+            binding.textInput.text = getFormattedDisplayValue(inputValue1) // Use inputValue1 if result is null
+        }
+
+        if (inputValue2 != null && currentOperator != null) {
+            textEquationUpdate()
+        }
+    }
+
+
+    private fun saveCalculationState() {
+        val editor = sharedPreferences.edit()
+        editor.putString("inputValue1", inputValue1.toString())
+        editor.putString("inputValue2", inputValue2?.toString()) // Save inputValue2
+        editor.putString("result", result?.toString()) // Save result
+        editor.putString("currentOperator", currentOperator?.name)
+        editor.putString("equation", equation.toString())
+        editor.apply()
+    }
+
 
     private fun onPercentageClicked(){
         if (inputValue2 == null) {
@@ -114,6 +202,7 @@ class MainActivity : AppCompatActivity() {
             inputValue2 = null
             currentOperator = null
         }
+        saveCalculationState() // Save state after calculation
     }
 
     private fun onPlusMinusClicked(){
@@ -124,6 +213,7 @@ class MainActivity : AppCompatActivity() {
         }
         setInput()
         updateInputOnDisplay()
+        saveCalculationState() // Save state after calculation
     }
 
     private fun onAllClearClicked() {
@@ -165,6 +255,7 @@ class MainActivity : AppCompatActivity() {
         }
         textEquationUpdate()
         equation.clear() // Ready for the next input
+        saveCalculationState() // Save state after calculation
     }
 
     private fun onEqualsClicked() {
@@ -182,6 +273,7 @@ class MainActivity : AppCompatActivity() {
                 getFormattedDisplayValue(result)
             )
             historyList.add(formattedHistory)
+            saveHistory()
 
             // Prepare the API history item
             val expression = "$inputValue1 ${getOperatorSymbol()} $inputValue2"
@@ -212,6 +304,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             equation.clear().append(ZERO)
         }
+        saveCalculationState() // Save state after equals clicked
     }
 
 
@@ -305,10 +398,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateInputOnDisplay(){
-        if (result == null){
-            binding.textEquation.text = null
-        }
-        binding.textInput.text = equation
+        binding.textInput.text = getFormattedDisplayValue(inputValue1)
     }
 
     private fun getInputValue1() = inputValue1 ?: 0.0
