@@ -2,10 +2,18 @@ package com.example.calculator
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.example.calculator.databinding.ActivityMainBinding
+import com.example.calculator.service.HistoryItem
+import com.example.calculator.service.RetrofitClient
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,6 +34,7 @@ class MainActivity : AppCompatActivity() {
         setListeners()
         setNightModeIndicator()
     }
+
     private fun setListeners(){
         for (button in getNumericButtons()) {
             button.setOnClickListener { onNumberClicked(button.text.toString()) }
@@ -113,18 +122,38 @@ class MainActivity : AppCompatActivity() {
         } else {
             equation.insert(0, MINUS)
         }
-
         setInput()
         updateInputOnDisplay()
     }
 
     private fun onAllClearClicked() {
-        inputValue1 = 0.0
-        inputValue2 = null
-        currentOperator = null
-        result = null
-        equation.clear().append(ZERO)
-        clearDisplay()
+        RetrofitClient.instance.clearHistory().enqueue(object : Callback<Void> {
+            override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                if (response.isSuccessful) {
+                    historyList.clear()
+
+                    // Reset variables
+                    inputValue1 = 0.0
+                    inputValue2 = null
+                    currentOperator = null
+                    result = null
+                    equation.clear().append(ZERO)
+
+                    // Update UI
+                    clearDisplay()
+                    binding.textEquation.text = null
+                    binding.textInput.text = ZERO
+
+                    Log.d("API_SUCCESS", "History cleared successfully.")
+                } else {
+                    Log.e("API_ERROR", "Failed: ${response.code()} ${response.message()}")
+                }
+            }
+
+            override fun onFailure(call: Call<Void>, t: Throwable) {
+                Log.e("API_ERROR", "Failed to clear history: ${t.message}")
+            }
+        })
     }
 
     private fun onOperatorClicked(operator: Operator) {
@@ -144,6 +173,7 @@ class MainActivity : AppCompatActivity() {
             equation.clear().append(ZERO)
             updateResultOnDisplay()
 
+            // Format the history entry for local display
             val formattedHistory = String.format(
                 "%s %s %s = %s",
                 getFormattedDisplayValue(inputValue1),
@@ -153,7 +183,28 @@ class MainActivity : AppCompatActivity() {
             )
             historyList.add(formattedHistory)
 
-            binding.textEquation.text = "" // Clear the equation display
+            // Prepare the API history item
+            val expression = "$inputValue1 ${getOperatorSymbol()} $inputValue2"
+            val historyItem = HistoryItem(expression, result.toString())
+
+            // Send the history item to the API
+            RetrofitClient.instance.addHistory(historyItem).enqueue(object : Callback<HistoryItem> {
+                override fun onResponse(call: Call<HistoryItem>, response: Response<HistoryItem>) {
+                    if (response.isSuccessful) {
+                        historyList.add("${historyItem.expression} = ${historyItem.result}")
+                    }
+                }
+
+                override fun onFailure(call: Call<HistoryItem>, t: Throwable) {
+                    Log.e("API_ERROR", "Failed to add history: ${t.message}")
+                    Toast.makeText(this@MainActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                }
+            })
+
+            // Clear the equation display
+            binding.textEquation.text = ""
+
+            // Update inputs and operator for the next calculation
             inputValue1 = result
             result = null
             inputValue2 = null
@@ -162,6 +213,7 @@ class MainActivity : AppCompatActivity() {
             equation.clear().append(ZERO)
         }
     }
+
 
     private fun calculate(): Double {
         val operand1 = getInputValue1()
@@ -292,5 +344,4 @@ class MainActivity : AppCompatActivity() {
         const val DOUBLE_ZERO = "00"
         const val MINUS = "-"
     }
-
 }
